@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools"
+              android:orientation="horizontal"
+              android:padding="8dp"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content">
+  <ImageView
+      android:layout_width="70dp"
+      android:layout_height="70dp"
+      tools:src="@drawable/brokerlogoo"/>
+  <LinearLayout
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_gravity="center"
+      android:padding="5dp"
+      android:orientation="vertical">
+    <TextView
+        android:id="@+id/productNameEditText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:text="@tools:sample/lorem[3]" />
+    <TextView
+        android:id="@+id/productTypeEditText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:text="@tools:sample/lorem[4]" />
+    <TextView
+        android:id="@+id/addressEditText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:text="@tools:sample/lorem[2]" />
+  </LinearLayout>
+
+  <TextView
+      android:id="@+id/deleteButton"
+      android:layout_gravity="center"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:textAllCaps="true"
+      android:textAlignment="center"
+      android:textColor="#E61111"
+      android:text="Delete" />
+
+</LinearLayout>

@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Broker</string>
+    <string name="open_app">Open</string>
+    <string name="close_app">Close</string>
+</resources>

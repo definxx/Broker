@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android" >
+
+    <item android:id="@+id/home" android:title="Home" android:icon="@drawable/baseline_other_houses_24"/>
+    <item android:id="@+id/addpayment" android:title="Add Payment" android:icon="@drawable/baseline_upload_file_24"/>
+    <item android:id="@+id/viewPayment" android:title="View Payment" android:icon="@drawable/baseline_monitor_24"/>
+
+    <item android:id="@+id/users" android:icon="@drawable/baseline_supervised_user_circle_24" android:title="Users" />
+    <item android:id="@+id/logout" android:title="Logout" android:icon="@drawable/baseline_logout_24"/>
+</menu>
