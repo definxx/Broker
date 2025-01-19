@@ -27,8 +27,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import androidx.lifecycle.lifecycleScope
+import com.example.broker.LoginActivity
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.setBody
+import io.ktor.http.Url
+import io.ktor.http.parameters
+import java.io.OutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 class EditUserActivity : AppCompatActivity() {
     private val updateUserMoney = "https://oxfpips.com/api/updateuserprofite"
@@ -77,42 +83,40 @@ class EditUserActivity : AppCompatActivity() {
     }
 
     private fun updateClientAmount(clientProfit: String, clientDeposit: String) {
-        val client = HttpClient(CIO)
-
-        lifecycleScope.launch {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
-                val requestBody = JSONObject().apply {
-                    put("clientEmail", clientEmail)
-                    put("deposit", clientDeposit)
-                    put("profit", clientProfit)
-                    put("ownerEmail", emailFromIntent)
-                }.toString()
+                val url = URL(updateUserMoney)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                connection.doOutput = true // Enable output for sending body
 
-                val response: HttpResponse = client.post(updateUserMoney) {
-                    contentType(ContentType.Application.Json)
-                    setBody(requestBody)
-                }
+                val postData = "clientEmail=$clientEmail&deposit=$clientDeposit&profit=$clientProfit&ownerEmail=$emailFromIntent"
 
-                if (response.status == HttpStatusCode.OK) {
-                    val responseText = response.bodyAsText()
-                    Log.d("Response", responseText)
-                    withContext(Dispatchers.Main) {
-                        showToast("Payment updated successfully!")
-                        binding.userProfit.text.clear()
-                        binding.userDeposit.text.clear()
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        showToast("Failed to update payment: ${response.status}")
-                        binding.userProfit.text.clear()
-                        binding.userDeposit.text.clear()
+                // Write the request body
+                val outputStream: OutputStream = connection.outputStream
+                outputStream.write(postData.toByteArray())
+
+                val responseCode = connection.responseCode
+
+
+                // Read the response
+                val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
+
+                withContext(Dispatchers.Main) {
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        withContext(Dispatchers.Main) {
+                            // Pass the email to the next activity
+                            val goToMain = Intent(this@EditUserActivity, UsersActivity::class.java)
+                            goToMain.putExtra("email", emailFromIntent)  // Passing email as an extra
+                            startActivity(goToMain)
+                        }
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    showToast("Error: ${e.message}")
-                    binding.userProfit.text.clear()
-                    binding.userDeposit.text.clear()
+                    showToast("Exception: ${e.message}")
+                    Log.e("EditUserActivity", "Error in updateClientAmount", e)
                 }
             }
         }

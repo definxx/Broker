@@ -14,7 +14,6 @@ import com.google.android.material.navigation.NavigationView
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get
-import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +22,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private val userList = mutableListOf<User>()
     lateinit var toggle: ActionBarDrawerToggle
     private lateinit var emailFromIntent: String
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -58,7 +61,6 @@ class MainActivity : AppCompatActivity() {
 
     // Set up the Navigation Drawer
     private fun setupNavigation() {
-
         val navView: NavigationView = findViewById(R.id.navigationView)
         val drawerLayout: DrawerLayout = findViewById(R.id.drawerlayout)
         toggle = ActionBarDrawerToggle(
@@ -78,20 +80,20 @@ class MainActivity : AppCompatActivity() {
                     // Handle home item click (You can add functionality here)
                     Toast.makeText(this, "Home clicked", Toast.LENGTH_SHORT).show()
                 }
-                R.id.addpayment->{
+                R.id.addpayment -> {
                     val goAddPayment = Intent(this, AddpaymentActivity::class.java)
-                        goAddPayment.putExtra("email",emailFromIntent)
+                    goAddPayment.putExtra("email", emailFromIntent)
                     startActivity(goAddPayment)
                 }
 
-                R.id.viewPayment->{
+                R.id.viewPayment -> {
                     val goViewPayment = Intent(this, ViewpaymentActivity::class.java)
-                    goViewPayment.putExtra("email",emailFromIntent)
+                    goViewPayment.putExtra("email", emailFromIntent)
                     startActivity(goViewPayment)
                 }
-                R.id.users->{
+                R.id.users -> {
                     val goViewPayment = Intent(this, UsersActivity::class.java)
-                    goViewPayment.putExtra("email",emailFromIntent)
+                    goViewPayment.putExtra("email", emailFromIntent)
                     startActivity(goViewPayment)
                 }
 
@@ -112,56 +114,61 @@ class MainActivity : AppCompatActivity() {
 
     // Fetch user data from the server
     private fun getInfo() {
-        val client = HttpClient(CIO)
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response: HttpResponse = client.get(listOfUsersUrl)
+                val url = URL(listOfUsersUrl)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"  // Make sure the server supports GET
+                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                connection.doOutput = false  // Set to false for GET requests
 
-                val responseBody = response.bodyAsText()
-                Log.d("Response", "Fetched data: $responseBody")
+                // Handling response codes properly
+                val responseCode = connection.responseCode
 
-                withContext(Dispatchers.Main) {
-                    if (response.status == HttpStatusCode.OK) {
-                        val jsonResponse = JSONObject(responseBody)
-                        val jsonArray = jsonResponse.getJSONArray("data")
-                        userList.clear()
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    // Reading the response on success
+                    val reader = InputStreamReader(connection.inputStream)
+                    val responseBody = reader.readText()
+                    val jsonResponse = JSONObject(responseBody)
+                    val jsonArray = jsonResponse.getJSONArray("data")
+                    userList.clear()
 
-                        for (i in 0 until jsonArray.length()) {
-                            val userObject = jsonArray.getJSONObject(i)
-                            val name = userObject.getString("name")
-                            val email = userObject.getString("email")
-                            val profilePhotoUrl = userObject.optString("profile_photo_url", null)
+                    for (i in 0 until jsonArray.length()) {
+                        val userObject = jsonArray.getJSONObject(i)
+                        val name = userObject.getString("name")
+                        val email = userObject.getString("email")
+                        val profilePhotoUrl = userObject.optString("profile_photo_url", null)
 
-                            val user = User(name, email, profilePhotoUrl)
-                            userList.add(user)
-                        }
+                        val user = User(name, email, profilePhotoUrl)
+                        userList.add(user)
+                    }
 
+                    // Update UI on the main thread
+                    withContext(Dispatchers.Main) {
                         if (userList.isEmpty()) {
                             Toast.makeText(this@MainActivity, "No users found", Toast.LENGTH_SHORT).show()
+                        } else {
+                            recyclerView.adapter = UserAdapter(userList) { email ->
+                                val intent = Intent(this@MainActivity, EditUserActivity::class.java)
+                                intent.putExtra("clientEmail", email)
+                                intent.putExtra("ownerEmail", emailFromIntent)
+                                startActivity(intent)
+                            }
                         }
-
-                        // Set up the adapter with click listener
-                        recyclerView.adapter = UserAdapter(userList) { email ->
-                            // Navigate to the next activity and pass the email
-                            val intent = Intent(this@MainActivity, EditUserActivity::class.java)
-                            intent.putExtra("clientEmail", email)  // Pass the client email to the next activity
-                            intent.putExtra("ownerEmail", emailFromIntent)  // Pass the owner email to the next activity
-                            startActivity(intent)
-
-                        }
-
-
-                    } else {
-                        Toast.makeText(this@MainActivity, " ${response.status}", Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    // Handle server error
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Error: $responseCode - ${connection.responseMessage}", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
+                // Handle any exceptions
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Exception: ${e.message}", Toast.LENGTH_LONG).show()
                 }
-            } finally {
-                client.close()
             }
         }
     }
+
 }

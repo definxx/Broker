@@ -10,26 +10,26 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.broker.UsersActivity
 import com.example.broker.databinding.ActivityViewpaymentBinding
 import com.google.android.material.navigation.NavigationView
 import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.client.statement.HttpResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-
-
-
-import io.ktor.http.contentType
+import java.io.InputStreamReader
+import java.io.OutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 class ViewpaymentActivity : AppCompatActivity() {
 
@@ -70,48 +70,6 @@ class ViewpaymentActivity : AppCompatActivity() {
         }
     }
 
-    private fun updatePaymentStatus(id: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // Prepare the JSON body with the payment ID
-                val requestBody = JSONObject().apply {
-                    put("id", id)  // Send the 'id' as a JSON parameter
-                }.toString()
-
-                // Send the POST request with the body
-                val response: HttpResponse = client.post(updateUrl) {
-                    contentType(ContentType.Application.Json)
-                    setBody(requestBody)  // Attach the request body
-                }
-
-                withContext(Dispatchers.Main) {
-                    if (response.status == HttpStatusCode.OK) {
-                        // Find the index of the payment in the list and remove it
-                        val index = paymentList.indexOfFirst { it.id == id }
-                        if (index != -1) {
-                            paymentList.removeAt(index)
-                            recyclerView.adapter?.notifyItemRemoved(index)
-                            showToast("Payment updated successfully")
-                        } else {
-                            showToast("Payment not found in the list")
-                        }
-                    } else {
-                        showToast("Failed to update payment: ${response.status}")
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showToast("Error: ${e.message}")
-                }
-            }
-        }
-    }
-
-    // Helper function for displaying Toasts
-    private fun showToast(message: String) {
-        Toast.makeText(this@ViewpaymentActivity, message, Toast.LENGTH_LONG).show()
-    }
-
     private fun setupNavigationView() {
         val navView: NavigationView = findViewById(R.id.navigationView)
         val drawerLayout: DrawerLayout = findViewById(R.id.drawerlayout)
@@ -137,9 +95,9 @@ class ViewpaymentActivity : AppCompatActivity() {
                     goAddPayment.putExtra("email", emailFromIntent)
                     startActivity(goAddPayment)
                 }
-                R.id.users->{
+                R.id.users -> {
                     val goViewPayment = Intent(this, UsersActivity::class.java)
-                    goViewPayment.putExtra("email",emailFromIntent)
+                    goViewPayment.putExtra("email", emailFromIntent)
                     startActivity(goViewPayment)
                 }
                 R.id.viewPayment -> {
@@ -159,26 +117,33 @@ class ViewpaymentActivity : AppCompatActivity() {
     private fun getInfo() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response: HttpResponse = client.get(listofpaymentApi)
-                val responseBody = response.bodyAsText()
-                Log.d("Response", "Fetched data: $responseBody")
+                val url = URL(listofpaymentApi)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                connection.doOutput = false
 
-                withContext(Dispatchers.Main) {
-                    if (response.status == HttpStatusCode.OK) {
-                        val jsonResponse = JSONObject(responseBody)
-                        val jsonArray = jsonResponse.getJSONArray("paymentsystem")
-                        paymentList.clear()
+                val responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    // Reading the response on success
+                    val reader = InputStreamReader(connection.inputStream)
+                    val responseBody = reader.readText()
+                    val jsonResponse = JSONObject(responseBody)
+                    val jsonArray = jsonResponse.getJSONArray("paymentsystem")
+                    paymentList.clear()
 
-                        for (i in 0 until jsonArray.length()) {
-                            val userObject = jsonArray.getJSONObject(i)
-                            val productname = userObject.getString("productname")
-                            val producttype = userObject.getString("producttype")
-                            val address = userObject.getString("address")
-                            val paymentId = userObject.getString("id") // This is used for the payment's id
-                            val payment = Payment(paymentId ,productname, producttype, address)
-                            paymentList.add(payment)
-                        }
+                    for (i in 0 until jsonArray.length()) {
+                        val userObject = jsonArray.getJSONObject(i)
+                        val productname = userObject.getString("productname")
+                        val producttype = userObject.getString("producttype")
+                        val address = userObject.getString("address")
+                        val paymentId = userObject.getString("id") // This is used for the payment's id
+                        val payment = Payment(paymentId, productname, producttype, address)
+                        paymentList.add(payment)
+                    }
 
+                    // Update UI on the main thread
+                    withContext(Dispatchers.Main) {
                         if (paymentList.isEmpty()) {
                             Toast.makeText(this@ViewpaymentActivity, "No payment found", Toast.LENGTH_SHORT).show()
                         } else {
@@ -187,10 +152,9 @@ class ViewpaymentActivity : AppCompatActivity() {
                                 updatePaymentStatus(id) // Update payment when item is clicked
                             }
                         }
-                    } else {
-                        Toast.makeText(this@ViewpaymentActivity, "Error: ${response.status}", Toast.LENGTH_LONG).show()
                     }
                 }
+
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Log.e("Error", "Exception occurred: ${e.message}")
@@ -200,9 +164,51 @@ class ViewpaymentActivity : AppCompatActivity() {
         }
     }
 
+    private fun updatePaymentStatus(id: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val url = URL(updateUrl)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                connection.doOutput = true
+
+                val postData = "id=$id"
+                val output: OutputStream = connection.outputStream
+                output.write(postData.toByteArray())
+
+                val responseCode = connection.responseCode
+
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    withContext(Dispatchers.Main) {
+                        val index = paymentList.indexOfFirst { it.id == id }
+                        if (index != -1) {
+                            paymentList.removeAt(index)
+                            recyclerView.adapter?.notifyItemRemoved(index)
+                            showToast("Payment updated successfully")
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        showToast("Failed to update payment: $responseCode")
+                    }
+                }
+
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    showToast("Error: ${e.message}")
+                }
+            }
+        }
+    }
+
+    // Helper function for displaying Toasts
+    private fun showToast(message: String) {
+        Toast.makeText(this@ViewpaymentActivity, message, Toast.LENGTH_LONG).show()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         client.close()
     }
 }
-

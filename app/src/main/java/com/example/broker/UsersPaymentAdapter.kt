@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class UsersPaymentAdapter(private val usersPaymentList: List<UserInformation>) : RecyclerView.Adapter<UsersPaymentAdapter.UserPaymentHolder>() {
+class UsersPaymentAdapter(private val userInformation: List<UserInformation>) : RecyclerView.Adapter<UsersPaymentAdapter.UserPaymentHolder>() {
 
     // ViewHolder that holds references to the views for each item
     class UserPaymentHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -24,13 +24,14 @@ class UsersPaymentAdapter(private val usersPaymentList: List<UserInformation>) :
 
     // Binds the data to the view holder
     override fun onBindViewHolder(holder: UserPaymentHolder, position: Int) {
-        val userDeposit = usersPaymentList[position]
-        holder.name.text = userDeposit.name
-        holder.email.text = userDeposit.email
-        holder.profit.text = userDeposit.profit  // Deposit profit
-        holder.deposit.text = userDeposit.deposit  // Deposit amount
+        val user = userInformation[position]
+        holder.name.text = user.name
+        holder.email.text = user.email
+        holder.profit.text = user.profit // Total profit
+        holder.deposit.text = user.deposit // Total deposit
     }
 
+
     // Returns the total number of items in the list
-    override fun getItemCount() = usersPaymentList.size
+    override fun getItemCount() = userInformation.size
 }
